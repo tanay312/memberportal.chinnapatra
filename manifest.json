@@ -1,0 +1,23 @@
+{
+  "name": "Chinnapatra Artist Workspace",
+  "short_name": "Chinnapatra Member Desk",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#0b1938",
+  "theme_color": "#c89b3c",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "20260820_225159.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "20260820_225159.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
