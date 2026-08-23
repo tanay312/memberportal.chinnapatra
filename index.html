@@ -250,11 +250,6 @@
                 <i class="ph-fill ph-palette" style="font-size: 56px; color: var(--gold); margin-bottom: 12px; animation: floatIcon 3s infinite alternate;"></i>
                 <h2>Artist Portal</h2>
                 <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 32px;">Chinnapatra Official Workspace</p>
-                <div id="installAppContainer" style="display: none; padding: 0 24px 12px 24px;">
-    <button class="btn btn-primary" style="width: 100%;" onclick="ArtistApp.installPWA()">
-        <i class="ph-bold ph-download-simple"></i> Install App
-    </button>
-</div>
                 
 
                 <form id="formLogin" onsubmit="ArtistAuth.login(event)">
@@ -308,7 +303,12 @@
                 <div class="nav-item" onclick="ArtistApp.switchTab('tab-leave-apply', event)"><i class="ph-fill ph-calendar-plus"></i> Apply Leave</div>
                 <div class="nav-item" onclick="ArtistApp.switchTab('tab-leave-history', event)"><i class="ph-fill ph-clock-counter-clockwise"></i> Leave History</div>
             </nav>
-            
+
+            <div id="installAppContainer" style="display: none; padding: 0 24px 12px 24px;">
+    <button class="btn btn-primary" style="width: 100%;" onclick="ArtistApp.installPWA()">
+        <i class="ph-bold ph-download-simple"></i> Install App
+    </button>
+</div>
             <div style="padding: 24px;">
                 <button class="btn btn-danger-outline" style="width: 100%; border-color: rgba(239,68,68,0.5); color: #fca5a5;" onclick="ArtistAuth.logout()">
                     <i class="ph-bold ph-sign-out"></i> Secure Logout
