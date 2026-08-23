@@ -8,6 +8,13 @@
     <!-- Fonts & Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- PWA & Mobile Meta Tags -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b1938">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Chinnapatra">
+<link rel="apple-touch-icon" href="https://scontent.fccu1-2.fna.fbcdn.net/v/t39.99422-6/778958244_1765739718007264_5736662539565382334_n.png?stp=dst-jpg_tt6&cstp=mx2038x2048&ctp=s2038x2048&_nc_cat=109&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=0MpcU1D1JbwQ7kNvwGcIR-8&_nc_oc=AdoSJ_vcp43DIfhbbCov9_O74tx7UZuLxE0VivDar0e_oTBW-1Shp2G9P6yyYG_aMwg&_nc_zt=14&_nc_ht=scontent.fccu1-2.fna&_nc_gid=dYc4ZLnHFfgynE82sbGqzA&_nc_ss=7b2a8&oh=00_AQElpv77MdRue58DTwPy3wClsSJRjpxD0Xg2vWCZmzKq6Q&oe=6A910878">
     
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -243,9 +250,15 @@
                 <i class="ph-fill ph-palette" style="font-size: 56px; color: var(--gold); margin-bottom: 12px; animation: floatIcon 3s infinite alternate;"></i>
                 <h2>Artist Portal</h2>
                 <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 32px;">Chinnapatra Official Workspace</p>
+                <div id="installAppContainer" style="display: none; padding: 0 24px 12px 24px;">
+    <button class="btn btn-primary" style="width: 100%;" onclick="ArtistApp.installPWA()">
+        <i class="ph-bold ph-download-simple"></i> Install App
+    </button>
+</div>
+                
 
                 <form id="formLogin" onsubmit="ArtistAuth.login(event)">
-                    <div class="form-group"><label class="form-label">Artist ID</label><input type="text" id="loginId" class="form-control" required placeholder=""></div>
+                    <div class="form-group"><label class="form-label">Artist ID</label><input type="text" id="loginId" class="form-control" required placeholder="Enter Your ID"></div>
                     <div class="form-group"><label class="form-label">Password</label><input type="password" id="loginPass" class="form-control" required placeholder="Enter password"></div>
                     <button type="submit" class="btn btn-primary" style="width: 100%;">Secure Login <i class="ph-bold ph-arrow-right"></i></button>
                     
