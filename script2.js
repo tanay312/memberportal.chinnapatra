@@ -139,15 +139,25 @@
 
         const ArtistApp = {
             user: null,
+            myScore: 0,
 
             toggleSidebar: () => { document.getElementById('sidebar').classList.toggle('active'); },
-
-            init: () => {
-                let session = sessionStorage.getItem('artist_session');
-                if (!session) { 
-                    UI.switchView('view-auth'); 
-                    return; 
+            installPWA: () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.then((choiceResult) => {
+                        if (choiceResult.outcome === 'accepted') UI.showToast('Installing...', 'success');
+                        deferredPrompt = null;
+                        document.getElementById('installAppContainer').style.display = 'none';
+                    });
+                } else {
+                    UI.showToast('Use browser menu: "Add to Home screen"', 'warning');
                 }
+            },
+
+            init: async () => {
+                let session = sessionStorage.getItem('artist_session');
+                if (!session) { UI.switchView('view-auth'); return; }
 
                 ArtistApp.user = JSON.parse(session);
                 UI.switchView('view-dashboard');
@@ -166,7 +176,7 @@
                 
                 document.getElementById('idCardName').innerText = ArtistApp.user.name;
                 document.getElementById('idCardDept').innerText = ArtistApp.user.department || 'Creative Team';
-                document.getElementById('idCardId').innerText = shortId; // SHOW ONLY FIRST 6 DIGITS
+                document.getElementById('idCardId').innerText = shortId; 
                 document.getElementById('idCardDob').innerText = ArtistApp.user.dob || '--/--/----';
                 document.getElementById('idCardMob').innerText = ArtistApp.user.mobile_number || 'N/A';
 
@@ -175,6 +185,7 @@
                 document.getElementById('gMobile').value = ArtistApp.user.mobile_number || '';
                 if(ArtistApp.user.email) document.getElementById('gEmail').value = ArtistApp.user.email;
 
+                await ArtistApp.calculateMyPoints();
                 ArtistApp.checkLeaveStatus();
                 ArtistApp.checkBirthday();
                 ArtistApp.loadWork();
@@ -182,6 +193,14 @@
                 ArtistApp.loadVault();
                 ArtistApp.loadLeaderboard();
                 ArtistApp.loadGrievances();
+            },
+
+            calculateMyPoints: async () => {
+                const activities = await DB.get('artist_activities') || [];
+                const myActs = activities.filter(act => act.artist_id === ArtistApp.user.id);
+                ArtistApp.myScore = myActs.reduce((sum, act) => sum + (parseInt(act.auto_score) || 0), 0);
+                document.getElementById('sidebarPointsVal').innerText = ArtistApp.myScore;
+                document.getElementById('topPointsVal').innerText = ArtistApp.myScore;
             },
 
             switchTab: (tabId, e) => {
@@ -194,10 +213,7 @@
 
             checkLeaveStatus: async () => {
                 const today = new Date().toISOString().split('T')[0];
-                const { data: leaves } = await supabaseClient.from('member_leave_requests').select('*')
-                    .eq('mobile', ArtistApp.user.mobile_number)
-                    .eq('status', 'Approved');
-                
+                const { data: leaves } = await supabaseClient.from('member_leave_requests').select('*').eq('mobile', ArtistApp.user.mobile_number).eq('status', 'Approved');
                 if (leaves && leaves.length > 0) {
                     const onLeave = leaves.some(l => today >= l.leave_from && today <= l.leave_to);
                     if (onLeave) {
@@ -224,9 +240,7 @@
                         <div style="text-align: center; padding: 20px;">
                             <div style="font-size: 80px; animation: floatIcon 2s ease-in-out infinite alternate;">🎈</div>
                             <h2 style="color: var(--gold); font-size: 28px; margin-top: 16px; font-family: var(--font-heading);">Happy Birthday, ${u.name.split(' ')[0]}!</h2>
-                            <p style="color: var(--primary); margin-top: 12px; font-size: 15px; font-weight: 500;">
-                                Wishing you a fantastic day filled with joy and creativity. Thank you for being an amazing part of Chinnapatra!
-                            </p>
+                            <p style="color: var(--primary); margin-top: 12px; font-size: 15px; font-weight: 500;">Wishing you a fantastic day filled with joy and creativity. Thank you for being an amazing part of Chinnapatra!</p>
                             <button class="btn btn-primary ripple-btn" style="margin-top: 24px; padding: 12px 32px; width:100%;" onclick="UI.closeModal()">Thank You! ✨</button>
                         </div>
                     `);
@@ -287,7 +301,7 @@
             },
 
             loadLeaderboard: async () => {
-                const tbody = document.getElementById('leaderboardBody');
+                const listContainer = document.getElementById('leaderboardList');
                 const podium = document.getElementById('podiumContainer');
                 
                 const artists = await DB.get('artists') || [];
@@ -299,58 +313,56 @@
                     return { ...a, score };
                 }).filter(a => a.score > 0).sort((a, b) => b.score - a.score);
 
-                if (leaderboard.length === 0) {
-                    podium.innerHTML = '';
-                    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No points scored yet this month.</td></tr>';
-                    return;
-                }
-
+                // --- 1. Render Premium Podium (Top 3) ---
                 let podiumHtml = '';
                 const places = [
-                    { rank: 2, height: '140px', color: '#94a3b8', obj: leaderboard[1] },
-                    { rank: 1, height: '180px', color: '#fbbf24', obj: leaderboard[0] },
-                    { rank: 3, height: '110px', color: '#b45309', obj: leaderboard[2] }
+                    { rank: 2, height: '140px', grad: 'var(--grad-silver)', border: '#94a3b8', obj: leaderboard[1] },
+                    { rank: 1, height: '180px', grad: 'var(--grad-gold)', border: '#fbbf24', obj: leaderboard[0] },
+                    { rank: 3, height: '110px', grad: 'var(--grad-bronze)', border: '#b45309', obj: leaderboard[2] }
                 ];
 
                 places.forEach(p => {
                     if (!p.obj) return;
                     const isMe = p.obj.name === ArtistApp.user.name; 
                     const nameColor = isMe ? 'var(--gold)' : 'var(--primary)';
-                    const crown = p.rank === 1 ? '<i class="ph-fill ph-crown" style="color:#fbbf24; font-size:36px; position:absolute; top:-30px; text-shadow: 0 4px 10px rgba(0,0,0,0.2);"></i>' : '';
+                    const crown = p.rank === 1 ? '<i class="ph-fill ph-crown" style="color:#fbbf24; font-size:40px; position:absolute; top:-35px; text-shadow: 0 4px 15px rgba(251,191,36,0.4);"></i>' : '';
                     let avatarContent = p.obj.image_link ? `<img src="${p.obj.image_link}">` : p.obj.name.charAt(0);
 
                     podiumHtml += `
                         <div class="podium-step">
                             <div style="position:relative; display:flex; justify-content:center;">
                                 ${crown}
-                                <div class="podium-avatar" style="border-color: ${p.color};">${avatarContent}</div>
+                                <div class="podium-avatar" style="border-color: ${p.border};">${avatarContent}</div>
                             </div>
-                            <div style="font-size: 12px; font-weight: 700; color: ${nameColor}; text-align:center; margin-bottom: 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100px;">${p.obj.name.split(' ')[0]}</div>
-                            <div style="font-size: 11px; font-weight: 600; color:var(--text-muted); margin-bottom: 8px;">${p.obj.score} Pts</div>
-                            <div class="podium-box" style="height: ${p.height}; background: linear-gradient(to bottom, ${p.color}, rgba(200,155,60,0.05));">
-                                <span style="font-size: 36px; font-weight: 800; color: rgba(255,255,255,0.7);">${p.rank}</span>
-                            </div>
+                            <div style="font-size: 13px; font-weight: 700; color: ${nameColor}; text-align:center; margin-bottom: 2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:110px;">${p.obj.name.split(' ')[0]}</div>
+                            <div style="font-size: 11px; font-weight: 800; color:var(--text-muted); margin-bottom: 12px; background: rgba(0,0,0,0.05); padding: 2px 8px; border-radius: 10px;">${p.obj.score} Pts</div>
+                            <div class="podium-box" style="height: ${p.height}; background: ${p.grad};"><span style="font-size: 40px; font-weight: 800; color: rgba(255,255,255,0.8); text-shadow: 0 4px 10px rgba(0,0,0,0.15);">${p.rank}</span></div>
                         </div>
                     `;
                 });
                 podium.innerHTML = podiumHtml;
 
-                let tableHtml = '';
+                // --- 2. Render Premium List Cards (Rank 4+) ---
+                let listHtml = '';
                 leaderboard.forEach((a, index) => {
                     if (index < 3) return; 
                     const isMe = a.name === ArtistApp.user.name;
-                    const rowStyle = isMe ? 'background: rgba(200,155,60,0.1); font-weight: 700;' : '';
-                    let tAvatar = a.image_link ? `<img src="${a.image_link}" style="width:30px; height:30px; border-radius:50%; object-fit:cover;">` : `<div style="width:30px; height:30px; border-radius:50%; background:var(--primary); color:white; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold;">${a.name.charAt(0)}</div>`;
+                    const meClass = isMe ? 'is-me' : '';
+                    let tAvatar = a.image_link ? `<img src="${a.image_link}" style="width:100%; height:100%; object-fit:cover;">` : `<div style="width:100%; height:100%; background:var(--primary); color:white; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:bold;">${a.name.charAt(0)}</div>`;
                     
-                    tableHtml += `<tr style="${rowStyle}">
-                        <td style="font-weight:bold; color:var(--text-muted);">#${index + 1}</td>
-                        <td style="display:flex; align-items:center; gap:8px;">${tAvatar} ${a.name} ${isMe ? '<span class="badge badge-success" style="font-size:9px; padding:2px 6px;">YOU</span>' : ''}</td>
-                        <td>${a.department || '-'}</td>
-                        <td><strong style="color: var(--gold);">${a.score} Pts</strong></td>
-                    </tr>`;
+                    listHtml += `
+                        <div class="leaderboard-card ${meClass}">
+                            <div style="display: flex; align-items: center; gap: 16px;">
+                                <div style="font-weight: 800; font-size: 18px; color: var(--text-muted); width: 30px;">#${index + 1}</div>
+                                <div style="width: 44px; height: 44px; border-radius: 50%; overflow: hidden; border: 2px solid var(--gold-light);">${tAvatar}</div>
+                                <div><div style="font-weight: 700; font-size: 15px; color: var(--primary); font-family: var(--font-heading);">${a.name} ${isMe ? '<span class="badge badge-success" style="font-size:9px; padding:2px 6px; margin-left:6px;">YOU</span>' : ''}</div></div>
+                            </div>
+                            <div style="font-weight: 800; font-size: 18px; color: var(--gold);">${a.score} <span style="font-size: 11px; color: var(--text-muted);">Pts</span></div>
+                        </div>
+                    `;
                 });
                 
-                tbody.innerHTML = tableHtml || '<tr><td colspan="4" class="text-center text-muted">No other ranked artists yet.</td></tr>';
+                listContainer.innerHTML = listHtml || (leaderboard.length <= 3 ? '<div class="text-center text-muted" style="padding: 20px;">No other ranked artists yet.</div>' : '');
             },
 
             // --- 1:1 EXACT HTML PRINT DOWNLOAD FOR ID CARD ---
@@ -418,7 +430,6 @@
 
             // --- SUPPORT & GRIEVANCE ---
             selectedGrievanceFiles: [],
-
             handleFiles: (input) => {
                 const files = Array.from(input.files);
                 const dropzone = document.getElementById('dropzone');
@@ -448,13 +459,11 @@
                     statusText.style.display = 'block';
                 }
             },
-
             submitGrievance: async (e) => {
                 e.preventDefault();
                 const btn = e.target.querySelector('button');
                 const orig = btn.innerHTML;
-                btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Processing...'; 
-                btn.disabled = true;
+                btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Processing...'; btn.disabled = true;
 
                 try {
                     let imageUrls = [];
@@ -504,17 +513,12 @@
                     console.error(err);
                     UI.showToast(`Error: ${err.message}`, 'error');
                 } finally {
-                    btn.innerHTML = orig; 
-                    btn.disabled = false;
+                    btn.innerHTML = orig; btn.disabled = false;
                 }
             },
-
             loadGrievances: async () => {
                 const container = document.getElementById('grievanceHistoryContainer');
-                container.innerHTML = '<div style="text-align:center;"><i class="ph ph-spinner ph-spin"></i> Loading...</div>';
-
-                const { data: issues, error } = await supabaseClient.from('member_complaints')
-                                                      .select('*').eq('member_id', ArtistApp.user.id).order('created_at', { ascending: false });
+                const { data: issues, error } = await supabaseClient.from('member_complaints').select('*').eq('member_id', ArtistApp.user.id).order('created_at', { ascending: false });
 
                 if (error || !issues || issues.length === 0) {
                     container.innerHTML = '<div style="padding: 20px; border: 1px dashed rgba(0,0,0,0.1); border-radius: 12px; text-align: center; color: var(--text-muted);">No grievances filed.</div>';
@@ -525,7 +529,6 @@
                 issues.forEach(i => {
                     const statusClass = i.status === 'Resolved' ? 'badge-success' : (i.status === 'Reviewed' ? 'badge-pending' : 'badge-danger');
                     const dateStr = new Date(i.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
-                    
                     let attachHtml = '';
                     if (i.images && i.images.length > 0) {
                         attachHtml = `<div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">`;
@@ -556,9 +559,10 @@
             submitLeave: async (e) => {
                 e.preventDefault();
                 const days = parseInt(document.getElementById('leaveDays').innerText);
-                if (days <= 0) return UI.showToast('Invalid date', 'error');
+                if (days <= 0) return UI.showToast('Invalid date range', 'error');
 
                 const btn = e.target.querySelector('button');
+                const orig = btn.innerHTML;
                 btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Submitting...'; btn.disabled = true;
 
                 await DB.insert('member_leave_requests', {
@@ -571,7 +575,7 @@
                     status: 'Pending'
                 });
 
-                btn.innerHTML = 'Submit Request'; btn.disabled = false;
+                btn.innerHTML = orig; btn.disabled = false;
                 UI.showToast('Leave request submitted!', 'success');
                 e.target.reset(); document.getElementById('leaveDays').innerText = '0';
                 
@@ -594,3 +598,4 @@
         };
 
         window.onload = () => { ArtistApp.init(); };
+    
