@@ -1,3 +1,4 @@
+
         const SUPABASE_URL = 'https://azdwdqwhwrhmcsxgwzal.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_offnM0Rq9v3WUqIco1Dowg_EIe-9MEV';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -19,7 +20,7 @@
             showToast: (msg, type = 'success') => {
                 const toast = document.createElement('div');
                 toast.className = `toast ${type === 'error' ? 'error' : ''}`;
-                toast.innerHTML = `<i class="ph-fill ${type === 'error' ? 'ph-x-circle' : 'ph-check-circle'}" style="font-size: 24px; color: ${type === 'error' ? 'var(--danger)' : 'var(--success)'};"></i> <span>${msg}</span>`;
+                toast.innerHTML = `<i class="ph-fill ${type === 'error' ? 'ph-warning-circle' : 'ph-check-circle'}" style="font-size: 24px; color: ${type === 'error' ? 'var(--danger)' : 'var(--success)'};"></i> <span>${msg}</span>`;
                 document.getElementById('toastArea').appendChild(toast);
                 setTimeout(() => toast.classList.add('show'), 10);
                 setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 400); }, 3000);
@@ -36,7 +37,7 @@
         };
 
         function spawnConfetti() {
-            const colors = ['#c89b3c', '#e8dfc8', '#0b1938', '#ef4444', '#10b981'];
+            const colors = ['#D4AF37', '#1F2937', '#0A1128', '#FFFFFF'];
             for (let i = 0; i < 100; i++) {
                 let conf = document.createElement('div');
                 conf.className = 'confetti';
@@ -64,7 +65,7 @@
                 btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Verifying...'; btn.disabled = true;
 
                 const { data, error } = await supabaseClient.from('artists').select('*');
-                btn.innerHTML = 'Verify & Continue'; btn.disabled = false;
+                btn.innerHTML = 'Verify Identity'; btn.disabled = false;
 
                 if (error || !data || data.length === 0) return UI.showToast('Database Error or No Artists found.', 'error');
 
@@ -96,7 +97,7 @@
                 btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Saving...'; btn.disabled = true;
 
                 const { error } = await supabaseClient.from('artists').update({ password: p1 }).eq('id', ArtistAuth.tempUser.id);
-                btn.innerHTML = 'Save Password & Login'; btn.disabled = false;
+                btn.innerHTML = 'Save & Login'; btn.disabled = false;
 
                 if (error) return UI.showToast('Failed to save password.', 'error');
 
@@ -140,8 +141,17 @@
         const ArtistApp = {
             user: null,
             myScore: 0,
+            notificationsLoaded: false,
 
             toggleSidebar: () => { document.getElementById('sidebar').classList.toggle('active'); },
+            toggleNotifications: () => { 
+                const panel = document.getElementById('notifPanel');
+                panel.classList.toggle('active'); 
+                if(panel.classList.contains('active')) {
+                    document.getElementById('notifBadge').style.display = 'none'; // Clear badge when opened
+                    if(!ArtistApp.notificationsLoaded) ArtistApp.loadNotifications();
+                }
+            },
             installPWA: () => {
                 if (deferredPrompt) {
                     deferredPrompt.prompt();
@@ -162,7 +172,7 @@
                 ArtistApp.user = JSON.parse(session);
                 UI.switchView('view-dashboard');
 
-                document.getElementById('currentDateDisplay').innerText = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                document.getElementById('currentDateDisplay').innerText = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });
 
                 // Truncate ID to first 6 characters
                 const shortId = (ArtistApp.user.id || '').substring(0, 6).toUpperCase();
@@ -185,6 +195,7 @@
                 document.getElementById('gMobile').value = ArtistApp.user.mobile_number || '';
                 if(ArtistApp.user.email) document.getElementById('gEmail').value = ArtistApp.user.email;
 
+                // Load initial data
                 await ArtistApp.calculateMyPoints();
                 ArtistApp.checkLeaveStatus();
                 ArtistApp.checkBirthday();
@@ -193,6 +204,137 @@
                 ArtistApp.loadVault();
                 ArtistApp.loadLeaderboard();
                 ArtistApp.loadGrievances();
+                ArtistApp.loadNotifications();
+                
+                // Simulate checking for new notifications
+                setTimeout(() => {
+                    document.getElementById('notifBadge').style.display = 'block';
+                }, 3000);
+            },
+
+            loadNotifications: async () => {
+                // Fetch messages where target is 'ALL_ARTISTS' OR target matches this specific artist's ID
+                const { data, error } = await supabaseClient
+                    .from('admin_messages')
+                    .select('*')
+                    .or(`target_member_id.eq.ALL_ARTISTS,target_member_id.eq.${ArtistApp.user.id}`)
+                    .order('created_at', { ascending: false })
+                    .limit(10);
+                
+                if (!error && data && data.length > 0) {
+                    ArtistApp.notificationsData = data.map(d => ({
+                        id: d.id,
+                        title: d.title,
+                        message: d.message,
+                        date: new Date(d.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                        read: false
+                    }));
+                } else {
+                    ArtistApp.notificationsData = [];
+                }
+                // Fixed: Passing the data into the render function so it actually displays
+                ArtistApp.renderNotifications(ArtistApp.notificationsData); 
+            },
+
+            renderNotifications: (notifs) => {
+                const body = document.getElementById('notifBody');
+                const badge = document.getElementById('notifBadge');
+                
+                // 1. Calculate and update the unread badge on the bell icon
+                if (notifs) {
+                    const unreadCount = notifs.filter(n => !n.read).length;
+                    if (badge) {
+                        if (unreadCount > 0) {
+                            badge.style.display = 'flex';
+                            badge.innerText = unreadCount;
+                        } else {
+                            badge.style.display = 'none';
+                        }
+                    }
+                }
+
+                // 2. Empty state UI
+                if(!notifs || notifs.length === 0) {
+                    body.innerHTML = `
+                        <div style="text-align: center; padding: 40px 20px;">
+                            <div style="width: 64px; height: 64px; background: rgba(11,25,56,0.03); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+                                <i class="ph-fill ph-bell-slash" style="font-size: 28px; color: var(--text-muted); opacity: 0.5;"></i>
+                            </div>
+                            <p style="font-size: 13px; color: var(--text-muted); font-weight: 500;">You're all caught up!</p>
+                            <p style="font-size: 11px; color: rgba(11,25,56,0.3); margin-top: 4px;">No new messages from Admin</p>
+                        </div>`;
+                    return;
+                }
+                
+                // 3. Render Premium Notification Cards
+                let html = '';
+                notifs.forEach((n, i) => {
+                    const dateStr = n.date || 'Unknown Date'; 
+                    
+                    // Design variables based on Read/Unread state
+                    const bgColor = n.read ? 'var(--surface)' : 'rgba(200, 155, 60, 0.05)';
+                    const borderColor = n.read ? 'rgba(0,0,0,0.05)' : 'rgba(200, 155, 60, 0.3)';
+                    const iconBg = n.read ? 'rgba(11, 25, 56, 0.04)' : 'rgba(200, 155, 60, 0.15)';
+                    const iconColor = n.read ? 'var(--text-muted)' : 'var(--gold)';
+                    const titleColor = n.read ? 'var(--secondary)' : 'var(--primary)';
+                    
+                    html += `
+                        <div class="notif-item ${n.read ? '' : 'unread'}" 
+                             style="animation-delay: ${i * 0.05}s; display: flex; align-items: flex-start; gap: 14px; padding: 16px; border-radius: 12px; background: ${bgColor}; border: 1px solid ${borderColor}; position: relative; overflow: hidden; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);" 
+                             onclick="ArtistApp.markNotifRead(${n.id}, event)"
+                             onmouseover="this.style.transform='translateX(4px)'; this.style.boxShadow='var(--shadow-sm)';"
+                             onmouseout="this.style.transform='translateX(0)'; this.style.boxShadow='none';">
+                            
+                            <!-- Left Accent Line for Unread -->
+                            ${!n.read ? '<div style="position: absolute; top: 0; left: 0; bottom: 0; width: 4px; background: var(--gold);"></div>' : ''}
+                            
+                            <!-- Admin / Broadcast Icon -->
+                            <div style="width: 42px; height: 42px; border-radius: 50%; background: ${iconBg}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: ${iconColor}; font-size: 20px; transition: 0.3s;">
+                                <i class="ph-fill ph-broadcast"></i>
+                            </div>
+                            
+                            <!-- Notification Text Content -->
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                    <span style="font-weight: 700; color: ${titleColor}; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;">
+                                        ${n.title || 'Admin Message'}
+                                    </span>
+                                    <span style="font-size: 10px; color: var(--text-muted); font-weight: 600;">${dateStr}</span>
+                                </div>
+                                <div style="font-size: 12px; color: var(--text-muted); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                    ${n.message}
+                                </div>
+                            </div>
+                            
+                            <!-- Unread Red Dot -->
+                            ${!n.read ? '<div style="width: 10px; height: 10px; background: var(--danger); border-radius: 50%; margin-top: 6px; flex-shrink: 0; box-shadow: 0 0 0 2px var(--surface);"></div>' : ''}
+                        </div>
+                    `;
+                });
+                body.innerHTML = html;
+            },
+            clearNotifications: (e) => {
+                if (e) e.stopPropagation();
+                // Mark all as read
+                ArtistApp.notificationsData = ArtistApp.notificationsData.map(n => ({...n, read: true}));
+                // Re-render the UI with the updated data
+                ArtistApp.renderNotifications(ArtistApp.notificationsData);
+                UI.showToast('All messages marked as read.', 'success');
+            },
+
+            markNotifRead: (id, e) => {
+                if (e) e.stopPropagation();
+                
+                // Find the specific notification that was clicked
+                const notif = ArtistApp.notificationsData.find(n => n.id === id);
+                
+                // If it exists and is currently unread, mark it as read
+                if (notif && !notif.read) {
+                    notif.read = true;
+                    
+                    // Instantly re-render the list so the unread styling and badge count update
+                    ArtistApp.renderNotifications(ArtistApp.notificationsData);
+                }
             },
 
             calculateMyPoints: async () => {
@@ -239,9 +381,9 @@
                     UI.showModal('Birthday', `
                         <div style="text-align: center; padding: 20px;">
                             <div style="font-size: 80px; animation: floatIcon 2s ease-in-out infinite alternate;">🎈</div>
-                            <h2 style="color: var(--gold); font-size: 28px; margin-top: 16px; font-family: var(--font-heading);">Happy Birthday, ${u.name.split(' ')[0]}!</h2>
-                            <p style="color: var(--primary); margin-top: 12px; font-size: 15px; font-weight: 500;">Wishing you a fantastic day filled with joy and creativity. Thank you for being an amazing part of Chinnapatra!</p>
-                            <button class="btn btn-primary ripple-btn" style="margin-top: 24px; padding: 12px 32px; width:100%;" onclick="UI.closeModal()">Thank You! ✨</button>
+                            <h2 style="color: var(--gold); font-size: 32px; margin-top: 16px; font-family: var(--font-heading);">Happy Birthday, ${u.name.split(' ')[0]}!</h2>
+                            <p style="color: var(--primary); margin-top: 12px; font-size: 15px; font-weight: 500; line-height: 1.6;">Wishing you a fantastic day filled with joy and creativity. Thank you for being an amazing part of Chinnapatra!</p>
+                            <button class="btn btn-primary" style="margin-top: 32px; padding: 14px 40px; width:100%;" onclick="UI.closeModal()">Thank You! ✨</button>
                         </div>
                     `);
                 }
@@ -259,7 +401,7 @@
                 }).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
 
                 if (myWork.length === 0) {
-                    container.innerHTML = `<div style="grid-column: 1/-1; padding: 60px 20px; text-align: center; border: 2px dashed rgba(200,155,60,0.3); border-radius: var(--radius-lg); background: rgba(255,255,255,0.5);"><h3 style="color: var(--primary);">No Tasks Assigned</h3><p style="color: var(--text-muted);">You're all caught up!</p></div>`;
+                    container.innerHTML = `<div style="grid-column: 1/-1; padding: 60px 20px; text-align: center; border: 2px dashed #E5E7EB; border-radius: var(--radius-lg); background: var(--white);"><h3 style="color: var(--primary); font-size: 20px;">No Tasks Assigned</h3><p style="color: var(--text-muted); margin-top:8px;">You're all caught up!</p></div>`;
                     return;
                 }
 
@@ -267,12 +409,12 @@
                 myWork.forEach((w, i) => {
                     const isCompleted = w.status === 'Posted';
                     html += `
-                        <div class="glass-card" style="animation-delay: ${i*0.1}s; padding:20px; border-top: 4px solid ${isCompleted ? 'var(--success)' : 'var(--gold)'};">
-                            <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
-                                <div><span style="font-size:11px; font-weight:bold; color:var(--text-muted);">${w.work_id}</span><h3 style="font-size:18px;">${w.title}</h3></div>
+                        <div class="glass-card" style="animation: fadeUp 0.6s forwards; opacity:0; animation-delay: ${i*0.1}s; border-top: 4px solid ${isCompleted ? 'var(--success)' : 'var(--gold)'};">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:16px;">
+                                <div><span style="font-size:11px; font-weight:700; color:var(--text-muted); letter-spacing:1px;">${w.work_id}</span><h3 style="font-size:20px; margin-top:4px;">${w.title}</h3></div>
                                 <span class="badge ${isCompleted ? 'badge-success' : 'badge-pending'}">${w.status}</span>
                             </div>
-                            <div style="font-size:12px; color:var(--text-muted);">Platform: ${w.platform || 'Pending'}</div>
+                            <div style="font-size:13px; color:var(--text-muted); font-weight: 500;">Platform: ${w.platform || 'Pending Setup'}</div>
                         </div>
                     `;
                 });
@@ -283,17 +425,17 @@
                 const container = document.getElementById('vaultContainer');
                 const links = await DB.get('vault_links') || [];
                 if (links.length === 0) {
-                    container.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:40px; color:var(--text-muted); border: 2px dashed rgba(0,0,0,0.1); border-radius: 12px;">No assets available in the vault yet.</div>';
+                    container.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:60px; color:var(--text-muted); border: 2px dashed #E5E7EB; border-radius: var(--radius-lg); background: var(--white);">No assets available in the vault yet.</div>';
                     return;
                 }
 
                 let html = '';
-                links.forEach(l => {
+                links.forEach((l, i) => {
                     html += `
-                        <div class="glass-card" style="padding: 24px; border-top: 4px solid var(--gold);">
-                            <div style="width: 50px; height: 50px; background: rgba(200,155,60,0.1); color: var(--gold); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 16px;"><i class="ph-fill ph-google-drive-logo"></i></div>
-                            <h3 style="font-size: 18px; margin-bottom: 8px;">${l.title}</h3>
-                            <a href="${l.url}" target="_blank" class="btn btn-outline" style="width: 100%;">Access Files <i class="ph-bold ph-arrow-square-out"></i></a>
+                        <div class="glass-card" style="padding: 32px; border-top: 4px solid var(--primary); animation: fadeUp 0.6s forwards; opacity:0; animation-delay: ${i*0.1}s;">
+                            <div style="width: 56px; height: 56px; background: rgba(10, 17, 40, 0.05); color: var(--primary); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 20px;"><i class="ph-fill ph-google-drive-logo"></i></div>
+                            <h3 style="font-size: 18px; margin-bottom: 16px;">${l.title}</h3>
+                            <a href="${l.url}" target="_blank" class="btn btn-outline" style="width: 100%;">Access Securely <i class="ph-bold ph-arrow-square-out"></i></a>
                         </div>
                     `;
                 });
@@ -313,19 +455,19 @@
                     return { ...a, score };
                 }).filter(a => a.score > 0).sort((a, b) => b.score - a.score);
 
-                // --- 1. Render Premium Podium (Top 3) ---
+                // --- 1. Render Premium Podium (Top 3) Solid Colors ---
                 let podiumHtml = '';
                 const places = [
-                    { rank: 2, height: '140px', grad: 'var(--grad-silver)', border: '#94a3b8', obj: leaderboard[1] },
-                    { rank: 1, height: '180px', grad: 'var(--grad-gold)', border: '#fbbf24', obj: leaderboard[0] },
-                    { rank: 3, height: '110px', grad: 'var(--grad-bronze)', border: '#b45309', obj: leaderboard[2] }
+                    { rank: 2, height: '140px', bg: '#9CA3AF', border: '#D1D5DB', obj: leaderboard[1] },
+                    { rank: 1, height: '180px', bg: 'var(--gold)', border: '#FDE047', obj: leaderboard[0] },
+                    { rank: 3, height: '110px', bg: '#B45309', border: '#D97706', obj: leaderboard[2] }
                 ];
 
                 places.forEach(p => {
                     if (!p.obj) return;
                     const isMe = p.obj.name === ArtistApp.user.name; 
                     const nameColor = isMe ? 'var(--gold)' : 'var(--primary)';
-                    const crown = p.rank === 1 ? '<i class="ph-fill ph-crown" style="color:#fbbf24; font-size:40px; position:absolute; top:-35px; text-shadow: 0 4px 15px rgba(251,191,36,0.4);"></i>' : '';
+                    const crown = p.rank === 1 ? '<i class="ph-fill ph-crown" style="color:var(--gold); font-size:44px; position:absolute; top:-40px; text-shadow: 0 4px 10px rgba(212,175,55,0.3);"></i>' : '';
                     let avatarContent = p.obj.image_link ? `<img src="${p.obj.image_link}">` : p.obj.name.charAt(0);
 
                     podiumHtml += `
@@ -334,9 +476,9 @@
                                 ${crown}
                                 <div class="podium-avatar" style="border-color: ${p.border};">${avatarContent}</div>
                             </div>
-                            <div style="font-size: 13px; font-weight: 700; color: ${nameColor}; text-align:center; margin-bottom: 2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:110px;">${p.obj.name.split(' ')[0]}</div>
-                            <div style="font-size: 11px; font-weight: 800; color:var(--text-muted); margin-bottom: 12px; background: rgba(0,0,0,0.05); padding: 2px 8px; border-radius: 10px;">${p.obj.score} Pts</div>
-                            <div class="podium-box" style="height: ${p.height}; background: ${p.grad};"><span style="font-size: 40px; font-weight: 800; color: rgba(255,255,255,0.8); text-shadow: 0 4px 10px rgba(0,0,0,0.15);">${p.rank}</span></div>
+                            <div style="font-size: 14px; font-weight: 700; color: ${nameColor}; text-align:center; margin-bottom: 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:120px;">${p.obj.name.split(' ')[0]}</div>
+                            <div style="font-size: 12px; font-weight: 800; color:var(--text-muted); margin-bottom: 16px; background: #F3F4F6; padding: 4px 10px; border-radius: 12px;">${p.obj.score} Pts</div>
+                            <div class="podium-box" style="height: ${p.height}; background: ${p.bg};"><span style="font-size: 40px; font-weight: 800; color: var(--white);">${p.rank}</span></div>
                         </div>
                     `;
                 });
@@ -348,28 +490,28 @@
                     if (index < 3) return; 
                     const isMe = a.name === ArtistApp.user.name;
                     const meClass = isMe ? 'is-me' : '';
-                    let tAvatar = a.image_link ? `<img src="${a.image_link}" style="width:100%; height:100%; object-fit:cover;">` : `<div style="width:100%; height:100%; background:var(--primary); color:white; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:bold;">${a.name.charAt(0)}</div>`;
+                    let tAvatar = a.image_link ? `<img src="${a.image_link}" style="width:100%; height:100%; object-fit:cover;">` : `<div style="width:100%; height:100%; background:var(--primary); color:white; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:bold;">${a.name.charAt(0)}</div>`;
                     
                     listHtml += `
-                        <div class="leaderboard-card ${meClass}">
-                            <div style="display: flex; align-items: center; gap: 16px;">
-                                <div style="font-weight: 800; font-size: 18px; color: var(--text-muted); width: 30px;">#${index + 1}</div>
-                                <div style="width: 44px; height: 44px; border-radius: 50%; overflow: hidden; border: 2px solid var(--gold-light);">${tAvatar}</div>
-                                <div><div style="font-weight: 700; font-size: 15px; color: var(--primary); font-family: var(--font-heading);">${a.name} ${isMe ? '<span class="badge badge-success" style="font-size:9px; padding:2px 6px; margin-left:6px;">YOU</span>' : ''}</div></div>
+                        <div class="leaderboard-card ${meClass}" style="animation-delay: ${(index-3)*0.1}s;">
+                            <div style="display: flex; align-items: center; gap: 20px;">
+                                <div style="font-weight: 800; font-size: 20px; color: var(--text-muted); width: 40px;">#${index + 1}</div>
+                                <div style="width: 50px; height: 50px; border-radius: 50%; overflow: hidden; border: 2px solid #E5E7EB;">${tAvatar}</div>
+                                <div><div style="font-weight: 700; font-size: 16px; color: var(--primary); font-family: var(--font-heading);">${a.name} ${isMe ? '<span class="badge badge-success" style="font-size:10px; padding:2px 6px; margin-left:8px;">YOU</span>' : ''}</div></div>
                             </div>
-                            <div style="font-weight: 800; font-size: 18px; color: var(--gold);">${a.score} <span style="font-size: 11px; color: var(--text-muted);">Pts</span></div>
+                            <div style="font-weight: 800; font-size: 20px; color: var(--gold);">${a.score} <span style="font-size: 12px; color: var(--text-muted);">Pts</span></div>
                         </div>
                     `;
                 });
                 
-                listContainer.innerHTML = listHtml || (leaderboard.length <= 3 ? '<div class="text-center text-muted" style="padding: 20px;">No other ranked artists yet.</div>' : '');
+                listContainer.innerHTML = listHtml || (leaderboard.length <= 3 ? '<div class="text-center text-muted" style="padding: 40px; background: var(--white); border-radius: var(--radius-lg); border: 1px dashed #E5E7EB;">No other ranked artists yet.</div>' : '');
             },
 
             // --- 1:1 EXACT HTML PRINT DOWNLOAD FOR ID CARD ---
             downloadIDCardPDF: () => {
                 const u = ArtistApp.user;
                 const shortId = (u.id || '').substring(0, 6).toUpperCase();
-                const avatarHtml = u.image_link ? `<img src="${u.image_link}" style="width:100%; height:100%; object-fit:cover;">` : `<div style="font-size:36px; font-weight:bold; color:#0b1938;">${u.name.charAt(0)}</div>`;
+                const avatarHtml = u.image_link ? `<img src="${u.image_link}" style="width:100%; height:100%; object-fit:cover;">` : `<div style="font-size:40px; font-weight:bold; color:#0A1128;">${u.name.charAt(0)}</div>`;
 
                 let printWindow = window.open('', '_blank');
                 let html = `
@@ -377,23 +519,23 @@
                     <html>
                     <head>
                         <title>Chinnapatra_ID_${shortId}</title>
-                        <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+                        <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
                         <style>
-                            body { margin:0; padding:40px; display:flex; justify-content:center; align-items:center; background:#f4f4f4; font-family:'Poppins', sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                            .id-card { width: 330px; background: #0b1938; border-radius: 20px; overflow: hidden; border: 2px solid #c89b3c; color: white; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-                            .header { background: rgba(255,255,255,0.05); padding: 18px; text-align: center; border-bottom: 1px solid rgba(200,155,60,0.3); }
-                            .header h3 { color: #c89b3c; font-family: 'Playfair Display', serif; font-size: 24px; margin: 0; }
-                            .header p { font-size: 9px; color: rgba(255,255,255,0.6); letter-spacing: 2px; text-transform: uppercase; margin-top: 4px; }
-                            .body { padding: 24px; text-align: center; }
-                            .avatar { width: 90px; height: 90px; border-radius: 50%; border: 3px solid #c89b3c; margin: 0 auto 16px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-                            .name { font-size: 20px; font-weight: 700; font-family: 'Playfair Display', serif; margin-bottom: 4px; }
-                            .role { color: #c89b3c; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; }
-                            .details { background: rgba(0,0,0,0.3); padding: 14px; border-radius: 12px; text-align: left; font-size: 11px; }
-                            .details div { display: flex; justify-content: space-between; margin-bottom: 6px; border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 4px; }
+                            body { margin:0; padding:40px; display:flex; justify-content:center; align-items:center; background:#ffffff; font-family:'Poppins', sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                            .id-card { width: 340px; background: #0A1128; border-radius: 24px; overflow: hidden; border: 2px solid #D4AF37; color: white; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+                            .header { background: #1A2442; padding: 24px; text-align: center; border-bottom: 2px solid #D4AF37; }
+                            .header h3 { color: #D4AF37; font-family: 'Playfair Display', serif; font-size: 26px; margin: 0; letter-spacing: 1px;}
+                            .header p { font-size: 10px; color: #9CA3AF; letter-spacing: 3px; text-transform: uppercase; margin-top: 6px; font-weight: 600;}
+                            .body { padding: 32px 24px; text-align: center; background: #0A1128; }
+                            .avatar { width: 110px; height: 110px; border-radius: 50%; border: 4px solid #D4AF37; margin: 0 auto 20px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+                            .name { font-size: 24px; font-weight: 700; font-family: 'Playfair Display', serif; margin-bottom: 4px; }
+                            .role { color: #D4AF37; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 24px; }
+                            .details { background: #1A2442; padding: 18px; border-radius: 12px; text-align: left; font-size: 12px; }
+                            .details div { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 6px; }
                             .details div:last-child { margin-bottom: 0; border-bottom: none; padding-bottom: 0; }
-                            .details span.label { color: rgba(255,255,255,0.6); }
-                            .details span.val { font-weight: 600; }
-                            .footer { text-align: center; padding: 12px; background: rgba(0,0,0,0.5); font-size: 9px; color: rgba(255,255,255,0.5); letter-spacing: 1px; }
+                            .details span.label { color: #9CA3AF; }
+                            .details span.val { font-weight: 600; color: #fff;}
+                            .footer { text-align: center; padding: 16px; background: #1A2442; font-size: 10px; color: #9CA3AF; font-weight: 600; letter-spacing: 1px; border-top: 1px solid rgba(255,255,255,0.05); }
                             @media print {
                                 body { padding:0; background:none; }
                                 @page { size: portrait; margin: 10mm; }
@@ -411,9 +553,9 @@
                                 <div class="name">${u.name}</div>
                                 <div class="role">${u.department || 'Creative Team'}</div>
                                 <div class="details">
-                                    <div><span class="label">Artist ID:</span> <span class="val">${shortId}</span></div>
-                                    <div><span class="label">DOB:</span> <span class="val">${u.dob || 'N/A'}</span></div>
-                                    <div><span class="label">Mobile:</span> <span class="val">${u.mobile_number || 'N/A'}</span></div>
+                                    <div><span class="label">Artist ID</span> <span class="val">${shortId}</span></div>
+                                    <div><span class="label">D.O.B</span> <span class="val">${u.dob || 'N/A'}</span></div>
+                                    <div><span class="label">Mobile</span> <span class="val">${u.mobile_number || 'N/A'}</span></div>
                                 </div>
                             </div>
                             <div class="footer">AUTHORIZED BY CHINNAPATRA ADMIN</div>
@@ -493,7 +635,7 @@
                     const { error: dbError } = await supabaseClient.from('member_complaints').insert([payload]);
                     if (dbError) throw dbError;
                     
-                    UI.showToast('Grievance submitted successfully!', 'success');
+                    UI.showToast('Ticket submitted successfully!', 'success');
                     e.target.reset();
                     
                     ArtistApp.selectedGrievanceFiles = [];
@@ -521,28 +663,28 @@
                 const { data: issues, error } = await supabaseClient.from('member_complaints').select('*').eq('member_id', ArtistApp.user.id).order('created_at', { ascending: false });
 
                 if (error || !issues || issues.length === 0) {
-                    container.innerHTML = '<div style="padding: 20px; border: 1px dashed rgba(0,0,0,0.1); border-radius: 12px; text-align: center; color: var(--text-muted);">No grievances filed.</div>';
+                    container.innerHTML = '<div style="padding: 40px; border: 2px dashed #E5E7EB; border-radius: var(--radius-lg); text-align: center; color: var(--text-muted); background: var(--white);">No tickets filed.</div>';
                     return;
                 }
 
                 let html = '';
-                issues.forEach(i => {
+                issues.forEach((i, idx) => {
                     const statusClass = i.status === 'Resolved' ? 'badge-success' : (i.status === 'Reviewed' ? 'badge-pending' : 'badge-danger');
                     const dateStr = new Date(i.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
                     let attachHtml = '';
                     if (i.images && i.images.length > 0) {
-                        attachHtml = `<div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">`;
-                        i.images.forEach((img, idx) => { attachHtml += `<a href="${img}" target="_blank" style="font-size:11px; color:var(--primary); background:rgba(200,155,60,0.1); padding:4px 8px; border-radius:4px; font-weight:600; text-decoration:none;"><i class="ph-bold ph-image"></i> Link ${idx+1}</a>`; });
+                        attachHtml = `<div style="margin-top:16px; display:flex; gap:12px; flex-wrap:wrap;">`;
+                        i.images.forEach((img, jdx) => { attachHtml += `<a href="${img}" target="_blank" style="font-size:12px; color:var(--primary); background:#F3F4F6; border:1px solid #E5E7EB; padding:6px 12px; border-radius:6px; font-weight:600; text-decoration:none; display:flex; align-items:center; gap:6px; transition:var(--transition);"><i class="ph-bold ph-image"></i> File ${jdx+1}</a>`; });
                         attachHtml += `</div>`;
                     }
 
                     html += `
-                        <div class="glass-card" style="padding: 16px; border-left: 4px solid var(--primary); box-shadow: none; background: rgba(255,255,255,0.9);">
-                            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-                                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted);"><i class="ph-bold ph-calendar"></i> ${dateStr}</div>
+                        <div class="glass-card" style="padding: 24px; border-left: 6px solid var(--primary); animation: fadeUp 0.5s forwards; opacity:0; animation-delay:${idx*0.1}s;">
+                            <div style="display:flex; justify-content:space-between; align-items: center; margin-bottom:12px;">
+                                <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); display:flex; align-items:center; gap:6px;"><i class="ph-bold ph-calendar"></i> ${dateStr}</div>
                                 <span class="badge ${statusClass}">${i.status}</span>
                             </div>
-                            <div style="font-size: 13px; color: var(--text-dark); line-height: 1.5; white-space: pre-wrap;">${i.complaint_text}</div>
+                            <div style="font-size: 14px; color: var(--text-dark); line-height: 1.6; white-space: pre-wrap; font-weight:500;">${i.complaint_text}</div>
                             ${attachHtml}
                         </div>
                     `;
@@ -589,13 +731,17 @@
 
                 const myLeaves = leaves.filter(l => l.member_name.startsWith(ArtistApp.user.name));
                 let html = '';
-                myLeaves.forEach(l => {
+                myLeaves.forEach((l, idx) => {
                     const statusClass = l.status === 'Approved' ? 'badge-success' : (l.status === 'Rejected' ? 'badge-danger' : 'badge-pending');
-                    html += `<tr><td><strong>${l.leave_from}</strong> to <strong>${l.leave_to}</strong></td><td><div style="background: rgba(200,155,60,0.1); color: var(--gold); width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: 700;">${l.total_days}</div></td><td>"${l.reason}"</td><td><span class="badge ${statusClass}">${l.status}</span></td></tr>`;
+                    html += `<tr style="border-bottom: 1px solid #F3F4F6; animation: fadeIn 0.4s forwards; animation-delay:${idx*0.1}s; opacity:0;">
+                                <td style="padding: 20px; font-size: 14px;"><strong>${l.leave_from}</strong><br><span style="color:var(--text-muted); font-size:12px;">to</span><br><strong>${l.leave_to}</strong></td>
+                                <td style="padding: 20px;"><div style="background: var(--primary); color: var(--gold); width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: 700; font-size: 16px;">${l.total_days}</div></td>
+                                <td style="padding: 20px; font-size: 14px; font-style: italic; color: var(--text-dark); max-width: 300px;">"${l.reason}"</td>
+                                <td style="padding: 20px;"><span class="badge ${statusClass}">${l.status}</span></td>
+                             </tr>`;
                 });
-                tbody.innerHTML = html || '<tr><td colspan="4" class="text-center text-muted">No leave history.</td></tr>';
+                tbody.innerHTML = html || '<tr><td colspan="4" style="text-align:center; padding:40px; color:var(--text-muted); background:var(--white);">No leave history recorded.</td></tr>';
             }
         };
 
         window.onload = () => { ArtistApp.init(); };
-    
