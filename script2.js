@@ -417,84 +417,245 @@ if (deptData) {
             },
 
             loadWork: async () => {
-                const container = document.getElementById('workContainer');
-                const workflows = await DB.get('media_workflows');
-                if (!workflows) return;
+    const container = document.getElementById('workContainer');
+    const workflows = await DB.get('media_workflows');
+    if (!workflows) return;
 
-                const myWork = workflows.filter(w => {
-                    if (!w.artists_data) return false;
-                    const artistsArr = typeof w.artists_data === 'string' ? JSON.parse(w.artists_data) : w.artists_data;
-                    return artistsArr.some(a => a.artist_id === ArtistApp.user.id || a.artist_name === ArtistApp.user.name); 
-                }).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+    const myWork = workflows.filter(w => {
+        if (!w.artists_data) return false;
+        const artistsArr = typeof w.artists_data === 'string' ? JSON.parse(w.artists_data) : w.artists_data;
+        return artistsArr.some(a => a.artist_id === ArtistApp.user.id || a.artist_name === ArtistApp.user.name); 
+    }).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
 
-                if (myWork.length === 0) {
-                    container.innerHTML = `<div style="grid-column: 1/-1; padding: 60px 20px; text-align: center; border: 2px dashed #E5E7EB; border-radius: var(--radius-lg); background: var(--white);"><h3 style="color: var(--primary); font-size: 20px;">No Tasks Assigned</h3><p style="color: var(--text-muted); margin-top:8px;">You're all caught up!</p></div>`;
-                    return;
-                }
+    if (myWork.length === 0) {
+        container.innerHTML = `<div style="grid-column: 1/-1; padding: 60px 20px; text-align: center; border: 2px dashed #E5E7EB; border-radius: var(--radius-lg); background: var(--white);"><h3 style="color: var(--primary); font-size: 20px;">No Tasks Assigned</h3><p style="color: var(--text-muted); margin-top:8px;">You're all caught up!</p></div>`;
+        return;
+    }
 
-                // Inject dynamic CSS for the animated lines
-                let html = `
-                <style>
-                    @keyframes scanline {
-                        0% { transform: translateX(-100%); }
-                        100% { transform: translateX(100%); }
-                    }
-                    .animated-border-card {
-                        position: relative;
-                        overflow: hidden;
-                        transition: transform 0.3s ease, box-shadow 0.3s ease;
-                    }
-                    .animated-border-card:hover {
-                        transform: translateY(-4px);
-                        box-shadow: 0 12px 24px rgba(10, 17, 40, 0.08);
-                    }
-                    .card-top-line {
-                        position: absolute;
-                        top: 0; left: 0; right: 0; height: 3px;
-                        overflow: hidden;
-                        z-index: 2;
-                    }
-                    .card-top-line::after {
-                        content: '';
-                        position: absolute;
-                        top: 0; left: 0; width: 50%; height: 100%;
-                        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent);
-                        animation: scanline 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-                    }
-                </style>`;
+    // Inject Premium CSS for Status Timeline and Card styling
+    let html = `
+    <style>
+        @keyframes scanline {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 0 0 rgba(var(--status-rgb), 0.4); }
+            70% { box-shadow: 0 0 0 6px rgba(var(--status-rgb), 0); }
+            100% { box-shadow: 0 0 0 0 rgba(var(--status-rgb), 0); }
+        }
+        .premium-card {
+            position: relative;
+            background: linear-gradient(145deg, #ffffff, #f9fafb);
+            border: 1px solid rgba(10, 17, 40, 0.05);
+            border-radius: 16px;
+            padding: 24px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .premium-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 16px 32px rgba(10, 17, 40, 0.08);
+            border-color: rgba(10, 17, 40, 0.1);
+        }
+        .card-top-line {
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 4px;
+            z-index: 2;
+        }
+        .card-top-line::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 50%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent);
+            animation: scanline 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        }
+        
+        /* Status Tracker Styles */
+        .status-tracker {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 24px 0;
+            padding: 16px;
+            background: #fdfdfd;
+            border-radius: 12px;
+            border: 1px solid #f0f0f0;
+        }
+        .tracker-node {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            position: relative;
+            z-index: 2;
+            flex: 1;
+        }
+        .tracker-line {
+            flex: 1;
+            height: 2px;
+            background: #e5e7eb;
+            margin: 0 -10px;
+            margin-top: -20px;
+            z-index: 1;
+        }
+        .node-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #e5e7eb;
+            border: 2px solid #fff;
+        }
+        .node-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #9ca3af;
+        }
+        
+        /* Node States */
+        .node-prev .node-dot { background: #10b981; } /* Green for completed steps */
+        .node-prev .node-label { color: #10b981; }
+        
+        .node-curr .node-dot {
+            background: var(--status-color);
+            animation: pulse-glow 2s infinite;
+        }
+        .node-curr .node-label {
+            color: var(--status-color);
+            font-weight: 800;
+        }
 
-                myWork.forEach((w, i) => {
-                    const isCompleted = w.status === 'Posted';
-                    const lineColor = isCompleted ? 'var(--success)' : 'var(--gold)';
+        .premium-details-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px dashed rgba(10,17,40,0.1);
+        }
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .detail-label {
+            font-size: 10px;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+        .detail-value {
+            font-size: 13px;
+            color: var(--primary);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+    </style>`;
+
+    myWork.forEach((w, i) => {
+        // --- 1. STATUS TIMELINE LOGIC ---
+        // Define standard workflow steps
+        const flowSteps = ['Assigned', 'In Progress', 'Review', 'Posted'];
+        let currIdx = flowSteps.indexOf(w.status);
+        if (currIdx === -1) currIdx = 0; // Fallback if status is unknown
+
+        const prevStatus = currIdx > 0 ? flowSteps[currIdx - 1] : 'Start';
+        const currStatus = w.status || 'Pending';
+        const nextStatus = currIdx < flowSteps.length - 1 ? flowSteps[currIdx + 1] : 'Completed';
+
+        // --- 2. COLOR LOGIC (Red/Green/Gold) ---
+        let statusColor = '#f59e0b'; // Default Gold/Yellow
+        let statusRgb = '245, 158, 11';
+        
+        if (currStatus.toLowerCase().includes('post') || currStatus.toLowerCase().includes('complete')) {
+            statusColor = '#10b981'; // Green
+            statusRgb = '16, 185, 129';
+        } else if (currStatus.toLowerCase().includes('assign') || currStatus.toLowerCase().includes('pending')) {
+            statusColor = '#ef4444'; // Red
+            statusRgb = '239, 68, 68';
+        } else if (currStatus.toLowerCase().includes('progress')) {
+            statusColor = '#3b82f6'; // Blue for active work
+            statusRgb = '59, 130, 246';
+        }
+
+        // --- 3. TIME PARSING ---
+        const formatTime = (dateStr) => {
+            if (!dateStr) return 'TBD';
+            const d = new Date(dateStr);
+            return isNaN(d) ? 'TBD' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        };
+
+        const scheduleTime = formatTime(w.created_at || w.schedule_time);
+        const postTime = formatTime(w.posting_time || w.post_date || w.deadline);
+
+        // --- 4. BUILD CARD ---
+        html += `
+            <div class="premium-card" style="animation: fadeUp 0.6s forwards; opacity:0; animation-delay: ${i*0.1}s; --status-color: ${statusColor}; --status-rgb: ${statusRgb};">
+                <div class="card-top-line" style="background-color: var(--status-color);"></div>
+                
+                <!-- Header -->
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div>
+                        <span style="font-size:11px; font-weight:700; color:var(--text-muted); letter-spacing:1px; background: rgba(10,17,40,0.05); padding: 4px 8px; border-radius: 4px;">ID: ${w.work_id}</span>
+                        <h3 style="font-size:22px; margin-top:12px; color: var(--primary); letter-spacing: -0.5px;">${w.title}</h3>
+                    </div>
+                </div>
+
+                <!-- Status Tracker Line -->
+                <div class="status-tracker">
+                    <div class="tracker-node node-prev">
+                        <div class="node-dot"></div>
+                        <span class="node-label">${prevStatus}</span>
+                    </div>
+                    <div class="tracker-line" style="background: ${currIdx > 0 ? '#10b981' : '#e5e7eb'};"></div>
                     
-                    // Format Time safely
-                    const dateObj = new Date(w.created_at);
-                    const timeString = isNaN(dateObj) ? 'N/A' : dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' • ' + dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-
-                    html += `
-                        <div class="glass-card animated-border-card" style="animation: fadeUp 0.6s forwards; opacity:0; animation-delay: ${i*0.1}s; padding-top: 24px;">
-                            <div class="card-top-line" style="background-color: ${lineColor};"></div>
-                            <div style="display:flex; justify-content:space-between; margin-bottom:16px;">
-                                <div>
-                                    <span style="font-size:11px; font-weight:700; color:var(--text-muted); letter-spacing:1px;">${w.work_id}</span>
-                                    <h3 style="font-size:20px; margin-top:4px;">${w.title}</h3>
-                                </div>
-                                <span class="badge ${isCompleted ? 'badge-success' : 'badge-pending'}">${w.status}</span>
-                            </div>
-                            
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 20px; padding-top: 16px; border-top: 1px dashed rgba(10,17,40,0.1);">
-                                <div style="font-size:13px; color:var(--primary); font-weight: 600; display: flex; align-items: center; gap: 6px;">
-                                    <i class="ph-bold ph-monitor-play" style="font-size:16px;"></i> ${w.platform || 'Pending Setup'}
-                                </div>
-                                <div style="font-size:12px; color:var(--text-muted); font-weight: 500; display: flex; align-items: center; gap: 6px;">
-                                    <i class="ph-bold ph-clock" style="font-size:14px;"></i> ${timeString}
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-                container.innerHTML = html;
-            },
+                    <div class="tracker-node node-curr">
+                        <div class="node-dot"></div>
+                        <span class="node-label">${currStatus}</span>
+                    </div>
+                    <div class="tracker-line" style="background: ${currIdx === flowSteps.length - 1 ? 'var(--status-color)' : '#e5e7eb'};"></div>
+                    
+                    <div class="tracker-node node-next">
+                        <div class="node-dot"></div>
+                        <span class="node-label">${nextStatus}</span>
+                    </div>
+                </div>
+                
+                <!-- Bottom Details Grid -->
+                <div class="premium-details-grid">
+                    <div class="detail-item">
+                        <span class="detail-label">Platform</span>
+                        <span class="detail-value">
+                            <i class="ph-bold ph-monitor-play" style="color: #8b5cf6;"></i> 
+                            ${w.platform || 'Unassigned'}
+                        </span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Schedule Time</span>
+                        <span class="detail-value">
+                            <i class="ph-bold ph-calendar-plus" style="color: #3b82f6;"></i> 
+                            ${scheduleTime}
+                        </span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Posting Time</span>
+                        <span class="detail-value">
+                            <i class="ph-bold ph-paper-plane-tilt" style="color: #10b981;"></i> 
+                            ${postTime}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+},
 
             loadVault: async () => {
                 const container = document.getElementById('vaultContainer');
