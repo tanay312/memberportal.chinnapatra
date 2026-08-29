@@ -177,18 +177,44 @@
                 // Truncate ID to first 6 characters
                 const shortId = (ArtistApp.user.id || '').substring(0, 6).toUpperCase();
 
-                document.getElementById('sidebarName').innerText = ArtistApp.user.name;
-                document.getElementById('sidebarDept').innerText = ArtistApp.user.department || 'General Team';
-                
-                const avatarContent = ArtistApp.user.image_link ? `<img src="${ArtistApp.user.image_link}">` : ArtistApp.user.name.charAt(0);
-                document.getElementById('sidebarAvatar').innerHTML = avatarContent;
-                document.getElementById('idCardAvatar').innerHTML = avatarContent;
-                
-                document.getElementById('idCardName').innerText = ArtistApp.user.name;
-                document.getElementById('idCardDept').innerText = ArtistApp.user.department || 'Creative Team';
-                document.getElementById('idCardId').innerText = shortId; 
-                document.getElementById('idCardDob').innerText = ArtistApp.user.dob || '--/--/----';
-                document.getElementById('idCardMob').innerText = ArtistApp.user.mobile_number || 'N/A';
+                // 1. Basic Text Information
+document.getElementById('sidebarName').innerText = ArtistApp.user.name;
+document.getElementById('idCardName').innerText = ArtistApp.user.name;
+document.getElementById('idCardId').innerText = shortId; 
+document.getElementById('idCardDob').innerText = ArtistApp.user.dob || '--/--/----';
+document.getElementById('idCardMob').innerText = ArtistApp.user.mobile_number || 'N/A';
+
+// 2. Avatar Generation
+const avatarContent = ArtistApp.user.image_link 
+    ? `<img src="${ArtistApp.user.image_link}">` 
+    : ArtistApp.user.name.charAt(0);
+document.getElementById('sidebarAvatar').innerHTML = avatarContent;
+document.getElementById('idCardAvatar').innerHTML = avatarContent;
+
+// 3. Department Logic (Max 3 per line for ID Card)
+const deptData = ArtistApp.user.department;
+
+if (deptData) {
+    // Standard comma-separated string for the sidebar
+    document.getElementById('sidebarDept').innerText = Array.isArray(deptData) 
+        ? deptData.join(', ') 
+        : deptData;
+
+    // Process chunks of 3 for the ID card
+    const depts = Array.isArray(deptData) ? deptData : deptData.split(',').map(d => d.trim());
+    const chunks = [];
+    
+    for (let i = 0; i < depts.length; i += 3) {
+        chunks.push(depts.slice(i, i + 3).join(', '));
+    }
+    
+    // Use innerHTML to render the <br> line breaks
+    document.getElementById('idCardDept').innerHTML = chunks.join('<br>');
+} else {
+    // Fallbacks if no department data exists
+    document.getElementById('sidebarDept').innerText = 'General Team';
+    document.getElementById('idCardDept').innerText = 'Creative Team';
+}
 
                 document.getElementById('gName').value = ArtistApp.user.name;
                 document.getElementById('gId').value = shortId;
