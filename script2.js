@@ -210,6 +210,7 @@ if (deptData) {
     
     // Use innerHTML to render the <br> line breaks
     document.getElementById('idCardDept').innerHTML = chunks.join('<br>');
+        document.getElementById('sidebarDept').innerHTML = chunks.join('<br>');
 } else {
     // Fallbacks if no department data exists
     document.getElementById('sidebarDept').innerText = 'General Team';
