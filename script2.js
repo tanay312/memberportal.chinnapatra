@@ -432,16 +432,64 @@ if (deptData) {
                     return;
                 }
 
-                let html = '';
+                // Inject dynamic CSS for the animated lines
+                let html = `
+                <style>
+                    @keyframes scanline {
+                        0% { transform: translateX(-100%); }
+                        100% { transform: translateX(100%); }
+                    }
+                    .animated-border-card {
+                        position: relative;
+                        overflow: hidden;
+                        transition: transform 0.3s ease, box-shadow 0.3s ease;
+                    }
+                    .animated-border-card:hover {
+                        transform: translateY(-4px);
+                        box-shadow: 0 12px 24px rgba(10, 17, 40, 0.08);
+                    }
+                    .card-top-line {
+                        position: absolute;
+                        top: 0; left: 0; right: 0; height: 3px;
+                        overflow: hidden;
+                        z-index: 2;
+                    }
+                    .card-top-line::after {
+                        content: '';
+                        position: absolute;
+                        top: 0; left: 0; width: 50%; height: 100%;
+                        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent);
+                        animation: scanline 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+                    }
+                </style>`;
+
                 myWork.forEach((w, i) => {
                     const isCompleted = w.status === 'Posted';
+                    const lineColor = isCompleted ? 'var(--success)' : 'var(--gold)';
+                    
+                    // Format Time safely
+                    const dateObj = new Date(w.created_at);
+                    const timeString = isNaN(dateObj) ? 'N/A' : dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' • ' + dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
                     html += `
-                        <div class="glass-card" style="animation: fadeUp 0.6s forwards; opacity:0; animation-delay: ${i*0.1}s; border-top: 4px solid ${isCompleted ? 'var(--success)' : 'var(--gold)'};">
+                        <div class="glass-card animated-border-card" style="animation: fadeUp 0.6s forwards; opacity:0; animation-delay: ${i*0.1}s; padding-top: 24px;">
+                            <div class="card-top-line" style="background-color: ${lineColor};"></div>
                             <div style="display:flex; justify-content:space-between; margin-bottom:16px;">
-                                <div><span style="font-size:11px; font-weight:700; color:var(--text-muted); letter-spacing:1px;">${w.work_id}</span><h3 style="font-size:20px; margin-top:4px;">${w.title}</h3></div>
+                                <div>
+                                    <span style="font-size:11px; font-weight:700; color:var(--text-muted); letter-spacing:1px;">${w.work_id}</span>
+                                    <h3 style="font-size:20px; margin-top:4px;">${w.title}</h3>
+                                </div>
                                 <span class="badge ${isCompleted ? 'badge-success' : 'badge-pending'}">${w.status}</span>
                             </div>
-                            <div style="font-size:13px; color:var(--text-muted); font-weight: 500;">Platform: ${w.platform || 'Pending Setup'}</div>
+                            
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 20px; padding-top: 16px; border-top: 1px dashed rgba(10,17,40,0.1);">
+                                <div style="font-size:13px; color:var(--primary); font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                                    <i class="ph-bold ph-monitor-play" style="font-size:16px;"></i> ${w.platform || 'Pending Setup'}
+                                </div>
+                                <div style="font-size:12px; color:var(--text-muted); font-weight: 500; display: flex; align-items: center; gap: 6px;">
+                                    <i class="ph-bold ph-clock" style="font-size:14px;"></i> ${timeString}
+                                </div>
+                            </div>
                         </div>
                     `;
                 });
@@ -456,19 +504,24 @@ if (deptData) {
                     return;
                 }
 
+                // Relying on the same dynamic CSS injected by loadWork if called together, or safely re-injecting
                 let html = '';
                 links.forEach((l, i) => {
                     html += `
-                        <div class="glass-card" style="padding: 32px; border-top: 4px solid var(--primary); animation: fadeUp 0.6s forwards; opacity:0; animation-delay: ${i*0.1}s;">
-                            <div style="width: 56px; height: 56px; background: rgba(10, 17, 40, 0.05); color: var(--primary); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 20px;"><i class="ph-fill ph-google-drive-logo"></i></div>
+                        <div class="glass-card animated-border-card" style="padding: 32px; animation: fadeUp 0.6s forwards; opacity:0; animation-delay: ${i*0.1}s; position: relative;">
+                            <div class="card-top-line" style="background-color: var(--primary);"></div>
+                            <div style="width: 56px; height: 56px; background: rgba(10, 17, 40, 0.05); color: var(--primary); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 20px;">
+                                <i class="ph-fill ph-google-drive-logo"></i>
+                            </div>
                             <h3 style="font-size: 18px; margin-bottom: 16px;">${l.title}</h3>
-                            <a href="${l.url}" target="_blank" class="btn btn-outline" style="width: 100%;">Access Securely <i class="ph-bold ph-arrow-square-out"></i></a>
+                            <a href="${l.url}" target="_blank" class="btn btn-outline" style="width: 100%; display: flex; justify-content: center; gap: 8px;">
+                                Access Securely <i class="ph-bold ph-arrow-square-out"></i>
+                            </a>
                         </div>
                     `;
                 });
                 container.innerHTML = html;
             },
-
             loadLeaderboard: async () => {
                 const listContainer = document.getElementById('leaderboardList');
                 const podium = document.getElementById('podiumContainer');
