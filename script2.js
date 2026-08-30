@@ -238,7 +238,7 @@ if (deptData) {
                 setTimeout(() => {
                     document.getElementById('notifBadge').style.display = 'block';
                 }, 3000);
-                    AutoRefresh.start(3000);
+                    AutoRefresh.start(30000);
             },
 
             loadNotifications: async () => {
@@ -969,7 +969,7 @@ if (deptData) {
         const AutoRefresh = {
             intervalId: null,
             
-            start: (interval = 3000) => { // 30 seconds
+            start: (interval = 30000) => { // 30 seconds
                 if (AutoRefresh.intervalId) clearInterval(AutoRefresh.intervalId);
                 
                 console.log(`Auto Refresh Activated: Syncing every ${interval / 1000} seconds.`);
