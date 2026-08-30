@@ -418,245 +418,224 @@ if (deptData) {
 
             loadWork: async () => {
     const container = document.getElementById('workContainer');
+    
+    // ১. Premium Loading State
+    container.innerHTML = `
+        <div style="grid-column: 1/-1; text-align: center; padding: 80px 20px;">
+            <i class="ph-fill ph-spinner-gap ph-spin" style="font-size: 48px; color: var(--gold);"></i>
+            <p style="color: var(--primary); font-size: 15px; margin-top: 16px; font-weight: 600; letter-spacing: 0.5px; animation: pulse 2s infinite;">Loading your creative tasks...</p>
+        </div>
+    `;
+
     const workflows = await DB.get('media_workflows');
-    if (!workflows) return;
-
-    const myWork = workflows.filter(w => {
-        if (!w.artists_data) return false;
-        const artistsArr = typeof w.artists_data === 'string' ? JSON.parse(w.artists_data) : w.artists_data;
-        return artistsArr.some(a => a.artist_id === ArtistApp.user.id || a.artist_name === ArtistApp.user.name); 
-    }).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
-
-    if (myWork.length === 0) {
-        container.innerHTML = `<div style="grid-column: 1/-1; padding: 60px 20px; text-align: center; border: 2px dashed #E5E7EB; border-radius: var(--radius-lg); background: var(--white);"><h3 style="color: var(--primary); font-size: 20px;">No Tasks Assigned</h3><p style="color: var(--text-muted); margin-top:8px;">You're all caught up!</p></div>`;
+    if (!workflows) {
+        container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--danger); padding: 40px; background: #FEE2E2; border-radius: var(--radius-md);">Failed to load tasks. Please try again later.</div>`;
         return;
     }
 
-    // Inject Premium CSS for Status Timeline and Card styling
+    const myWork = workflows.filter(w => {
+        if (!w.artists_data) return false;
+        try {
+            const artistsArr = typeof w.artists_data === 'string' ? JSON.parse(w.artists_data) : w.artists_data;
+            return artistsArr.some(a => a.artist_id === ArtistApp.user.id || a.artist_name === ArtistApp.user.name); 
+        } catch(e) {
+            return false;
+        }
+    }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    if (myWork.length === 0) {
+        container.innerHTML = `
+            <div style="grid-column: 1/-1; padding: 80px 20px; text-align: center; border: 2px dashed #E5E7EB; border-radius: var(--radius-lg); background: var(--white); animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1);">
+                <div style="width: 80px; height: 80px; background: rgba(212, 175, 55, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; animation: floatIcon 3s infinite alternate;">
+                    <i class="ph-fill ph-paint-brush" style="font-size: 40px; color: var(--gold);"></i>
+                </div>
+                <h3 style="color: var(--primary); font-size: 26px; font-family: var(--font-heading); margin-bottom: 8px;">No Tasks Assigned</h3>
+                <p style="color: var(--text-muted); font-size: 15px; font-weight: 500;">You're all caught up! Take a break or explore the Digital Vault.</p>
+            </div>`;
+        return;
+    }
+
+    // ২. Inject Premium CSS for Timeline & Cards
     let html = `
     <style>
-        @keyframes scanline {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-        }
-        @keyframes pulse-glow {
-            0% { box-shadow: 0 0 0 0 rgba(var(--status-rgb), 0.4); }
-            70% { box-shadow: 0 0 0 6px rgba(var(--status-rgb), 0); }
-            100% { box-shadow: 0 0 0 0 rgba(var(--status-rgb), 0); }
-        }
-        .premium-card {
+        @keyframes scanlinePremium { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+        @keyframes fillTimeline { from { width: 0%; } }
+        @keyframes pulseGlowGold { 0% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.5); } 70% { box-shadow: 0 0 0 10px rgba(212, 175, 55, 0); } 100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); } }
+        
+        .artist-task-card {
             position: relative;
-            background: linear-gradient(145deg, #ffffff, #f9fafb);
+            background: var(--white);
             border: 1px solid rgba(10, 17, 40, 0.05);
             border-radius: 16px;
             padding: 24px;
             overflow: hidden;
-            transition: all 0.3s ease;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
         }
-        .premium-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 16px 32px rgba(10, 17, 40, 0.08);
-            border-color: rgba(10, 17, 40, 0.1);
+        .artist-task-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 20px 40px rgba(10, 17, 40, 0.08);
+            border-color: rgba(212, 175, 55, 0.3);
         }
-        .card-top-line {
-            position: absolute;
-            top: 0; left: 0; right: 0; height: 4px;
-            z-index: 2;
+        .card-accent-line {
+            position: absolute; top: 0; left: 0; right: 0; height: 4px; z-index: 2;
         }
-        .card-top-line::after {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; width: 50%; height: 100%;
+        .card-accent-line::after {
+            content: ''; position: absolute; top: 0; left: 0; width: 50%; height: 100%;
             background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent);
-            animation: scanline 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            animation: scanlinePremium 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
         }
-        
-        /* Status Tracker Styles */
-        .status-tracker {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin: 24px 0;
-            padding: 16px;
-            background: #fdfdfd;
-            border-radius: 12px;
-            border: 1px solid #f0f0f0;
+        .platform-box {
+            padding: 12px 16px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; transition: 0.3s; margin-bottom: 10px; cursor: default;
         }
-        .tracker-node {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 6px;
-            position: relative;
-            z-index: 2;
-            flex: 1;
-        }
-        .tracker-line {
-            flex: 1;
-            height: 2px;
-            background: #e5e7eb;
-            margin: 0 -10px;
-            margin-top: -20px;
-            z-index: 1;
-        }
-        .node-dot {
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background: #e5e7eb;
-            border: 2px solid #fff;
-        }
-        .node-label {
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: #9ca3af;
-        }
-        
-        /* Node States */
-        .node-prev .node-dot { background: #10b981; } /* Green for completed steps */
-        .node-prev .node-label { color: #10b981; }
-        
-        .node-curr .node-dot {
-            background: var(--status-color);
-            animation: pulse-glow 2s infinite;
-        }
-        .node-curr .node-label {
-            color: var(--status-color);
-            font-weight: 800;
-        }
-
-        .premium-details-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            margin-top: 20px;
-            padding-top: 16px;
-            border-top: 1px dashed rgba(10,17,40,0.1);
-        }
-        .detail-item {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .detail-label {
-            font-size: 10px;
-            color: #9ca3af;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-weight: 600;
-        }
-        .detail-value {
-            font-size: 13px;
-            color: var(--primary);
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
+        .platform-box:hover { transform: scale(1.02); }
+        .node-active { animation: pulseGlowGold 2s infinite; border-color: var(--gold) !important; background: var(--white) !important; color: var(--gold) !important; }
+        .node-done { background: var(--gold) !important; color: var(--white) !important; border-color: var(--gold) !important; }
+        .node-future { background: var(--bg-main) !important; color: #9CA3AF !important; border-color: #E5E7EB !important; }
     </style>`;
 
+    // Kolkata Time Formatter helper
+    const formatTimeKolkata = (isoStr) => {
+        if(!isoStr) return '';
+        return new Date(new Date(isoStr).toLocaleString("en-US", {timeZone: "Asia/Kolkata"}))
+            .toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+    };
+
     myWork.forEach((w, i) => {
-        // --- 1. STATUS TIMELINE LOGIC ---
-        // Define standard workflow steps
-        const flowSteps = ['Assigned', 'In Progress', 'Review', 'Posted'];
-        let currIdx = flowSteps.indexOf(w.status);
-        if (currIdx === -1) currIdx = 0; // Fallback if status is unknown
-
-        const prevStatus = currIdx > 0 ? flowSteps[currIdx - 1] : 'Start';
-        const currStatus = w.status || 'Pending';
-        const nextStatus = currIdx < flowSteps.length - 1 ? flowSteps[currIdx + 1] : 'Completed';
-
-        // --- 2. COLOR LOGIC (Red/Green/Gold) ---
-        let statusColor = '#f59e0b'; // Default Gold/Yellow
-        let statusRgb = '245, 158, 11';
+        const isCompleted = w.status === 'Posted';
+        const isScheduled = w.status === 'Scheduled' || isCompleted;
         
-        if (currStatus.toLowerCase().includes('post') || currStatus.toLowerCase().includes('complete')) {
-            statusColor = '#10b981'; // Green
-            statusRgb = '16, 185, 129';
-        } else if (currStatus.toLowerCase().includes('assign') || currStatus.toLowerCase().includes('pending')) {
-            statusColor = '#ef4444'; // Red
-            statusRgb = '239, 68, 68';
-        } else if (currStatus.toLowerCase().includes('progress')) {
-            statusColor = '#3b82f6'; // Blue for active work
-            statusRgb = '59, 130, 246';
+        // Timeline Width Calculation
+        let progressWidth = '15%'; // Default Pending
+        let step2Class = 'node-future'; let step2Icon = 'ph-calendar-plus';
+        let step3Class = 'node-future'; let step3Icon = 'ph-lock-key';
+
+        if (w.status === 'Pending Schedule') {
+            progressWidth = '15%';
+            step2Class = 'node-active'; step2Icon = 'ph-spinner ph-spin';
+        } else if (w.status === 'Scheduled') {
+            progressWidth = '50%';
+            step2Class = 'node-done'; step2Icon = 'ph-calendar-check';
+            step3Class = 'node-active'; step3Icon = 'ph-spinner ph-spin';
+        } else if (isCompleted) {
+            progressWidth = '100%';
+            step2Class = 'node-done'; step2Icon = 'ph-calendar-check';
+            step3Class = 'node-done'; step3Icon = 'ph-check-circle';
         }
 
-        // --- 3. TIME PARSING ---
-        const formatTime = (dateStr) => {
-            if (!dateStr) return 'TBD';
-            const d = new Date(dateStr);
-            return isNaN(d) ? 'TBD' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-        };
+        const cardTopColor = isCompleted ? 'var(--success)' : 'var(--gold)';
 
-        const scheduleTime = formatTime(w.created_at || w.schedule_time);
-        const postTime = formatTime(w.posting_time || w.post_date || w.deadline);
+        // --- PLATFORM & TIME RENDERING (FB & INSTA) ---
+        let platformUI = '';
+        const timeLabel = isCompleted ? 'Live On' : 'Scheduled For';
 
-        // --- 4. BUILD CARD ---
+        if (w.fb_time) {
+            platformUI += `
+                <div class="platform-box" style="background: rgba(24,119,242,0.05); border: 1px solid rgba(24,119,242,0.15);">
+                    <div style="display:flex; align-items:center; gap:8px; color: #1877F2; font-weight: 800; font-size: 14px;">
+                        <i class="ph-fill ph-facebook-logo" style="font-size:24px;"></i> Facebook
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 10px; color: #1877F2; font-weight: 700; text-transform: uppercase; opacity: 0.8;">${timeLabel}</div>
+                        <div style="color: var(--text-dark); font-weight: 700; font-size: 13px;">${formatTimeKolkata(w.fb_time)}</div>
+                    </div>
+                </div>`;
+        }
+        if (w.insta_time) {
+            platformUI += `
+                <div class="platform-box" style="background: rgba(225,48,108,0.05); border: 1px solid rgba(225,48,108,0.15);">
+                    <div style="display:flex; align-items:center; gap:8px; color: #E1306C; font-weight: 800; font-size: 14px;">
+                        <i class="ph-fill ph-instagram-logo" style="font-size:24px;"></i> Instagram
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 10px; color: #E1306C; font-weight: 700; text-transform: uppercase; opacity: 0.8;">${timeLabel}</div>
+                        <div style="color: var(--text-dark); font-weight: 700; font-size: 13px;">${formatTimeKolkata(w.insta_time)}</div>
+                    </div>
+                </div>`;
+        }
+        
+        // Fallback if no specific time is scheduled yet
+        if (!platformUI) {
+            platformUI = `
+                <div style="text-align: center; padding: 16px; background: var(--bg-main); border-radius: 12px; border: 1px dashed #E5E7EB; color: var(--text-muted); font-size: 13px; font-weight: 500;">
+                    <i class="ph-fill ph-clock" style="font-size: 20px; color: var(--gold); margin-bottom: 4px;"></i><br>
+                    Schedule Pending from PR Team
+                </div>`;
+        }
+
         html += `
-            <div class="premium-card" style="animation: fadeUp 0.6s forwards; opacity:0; animation-delay: ${i*0.1}s; --status-color: ${statusColor}; --status-rgb: ${statusRgb};">
-                <div class="card-top-line" style="background-color: var(--status-color);"></div>
+            <div class="artist-task-card" style="animation: fadeUp 0.6s forwards; opacity:0; animation-delay: ${i*0.1}s;">
+                <div class="card-accent-line" style="background-color: ${cardTopColor};"></div>
                 
-                <!-- Header -->
-                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <!-- Card Header -->
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 20px;">
                     <div>
-                        <span style="font-size:11px; font-weight:700; color:var(--text-muted); letter-spacing:1px; background: rgba(10,17,40,0.05); padding: 4px 8px; border-radius: 4px;">ID: ${w.work_id}</span>
-                        <h3 style="font-size:22px; margin-top:12px; color: var(--primary); letter-spacing: -0.5px;">${w.title}</h3>
+                        <span style="background: rgba(10,17,40,0.05); padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 800; color: var(--text-muted); letter-spacing: 1px; display: inline-block; margin-bottom: 8px;">
+                            ID: ${w.work_id}
+                        </span>
+                        <h3 style="font-size: 20px; color: var(--primary); font-family: var(--font-heading); line-height: 1.3; margin: 0;">${w.title}</h3>
+                    </div>
+                    <span class="badge ${isCompleted ? 'badge-success' : 'badge-pending'}" style="flex-shrink: 0; font-size: 11px;">
+                        ${w.status}
+                    </span>
+                </div>
+
+                <!-- Animated Timeline Tracker -->
+                <div style="position: relative; margin: 32px 0; padding: 0 10px;">
+                    <!-- Background Line -->
+                    <div style="position: absolute; top: 16px; left: 10px; right: 10px; height: 4px; background: #E5E7EB; border-radius: 4px; z-index: 1;"></div>
+                    <!-- Animated Fill Line -->
+                    <div style="position: absolute; top: 16px; left: 10px; width: ${progressWidth}; height: 4px; background: var(--gold); border-radius: 4px; z-index: 2; animation: fillTimeline 1.5s ease-out forwards;"></div>
+                    
+                    <div style="display: flex; justify-content: space-between; position: relative; z-index: 3;">
+                        <!-- Step 1: Content Created -->
+                        <div style="display: flex; flex-direction: column; align-items: center; width: 33%;">
+                            <div class="node-done" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid; display: flex; justify-content: center; align-items: center; font-size: 16px; margin-bottom: 8px; background: var(--white); box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+                                <i class="ph-bold ph-palette"></i>
+                            </div>
+                            <span style="font-size: 11px; font-weight: 700; color: var(--primary); text-transform: uppercase;">Created</span>
+                        </div>
+
+                        <!-- Step 2: Scheduled -->
+                        <div style="display: flex; flex-direction: column; align-items: center; width: 33%;">
+                            <div class="${step2Class}" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid; display: flex; justify-content: center; align-items: center; font-size: 16px; margin-bottom: 8px; background: var(--white); transition: 0.3s; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+                                <i class="ph-bold ${step2Icon}"></i>
+                            </div>
+                            <span style="font-size: 11px; font-weight: 700; color: ${w.status === 'Pending Schedule' ? 'var(--gold)' : 'var(--primary)'}; text-transform: uppercase;">Scheduled</span>
+                        </div>
+
+                        <!-- Step 3: Published -->
+                        <div style="display: flex; flex-direction: column; align-items: center; width: 33%;">
+                            <div class="${step3Class}" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid; display: flex; justify-content: center; align-items: center; font-size: 16px; margin-bottom: 8px; background: var(--white); transition: 0.3s; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+                                <i class="ph-bold ${step3Icon}"></i>
+                            </div>
+                            <span style="font-size: 11px; font-weight: 700; color: ${isCompleted ? 'var(--primary)' : '#9CA3AF'}; text-transform: uppercase;">Published</span>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Status Tracker Line -->
-                <div class="status-tracker">
-                    <div class="tracker-node node-prev">
-                        <div class="node-dot"></div>
-                        <span class="node-label">${prevStatus}</span>
+                <!-- Platform Schedules -->
+                <div style="margin-bottom: 20px;">
+                    <div style="font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px;">
+                        <i class="ph-bold ph-share-network"></i> Distribution Plan
                     </div>
-                    <div class="tracker-line" style="background: ${currIdx > 0 ? '#10b981' : '#e5e7eb'};"></div>
-                    
-                    <div class="tracker-node node-curr">
-                        <div class="node-dot"></div>
-                        <span class="node-label">${currStatus}</span>
-                    </div>
-                    <div class="tracker-line" style="background: ${currIdx === flowSteps.length - 1 ? 'var(--status-color)' : '#e5e7eb'};"></div>
-                    
-                    <div class="tracker-node node-next">
-                        <div class="node-dot"></div>
-                        <span class="node-label">${nextStatus}</span>
-                    </div>
+                    ${platformUI}
                 </div>
+
+                <!-- Post Caption Display -->
+                ${w.caption ? `
+                    <div style="background: rgba(212,175,55,0.05); padding: 16px; border-radius: 12px; border: 1px solid rgba(212,175,55,0.2); position: relative; margin-top: 10px;">
+                        <i class="ph-fill ph-quotes" style="position: absolute; top: -10px; left: 16px; color: var(--gold); background: var(--white); padding: 0 8px; font-size: 20px;"></i>
+                        <div style="font-size: 13.5px; color: var(--text-dark); line-height: 1.6; font-style: italic; white-space: pre-wrap; margin-top: 4px;">${w.caption}</div>
+                    </div>
+                ` : ''}
                 
-                <!-- Bottom Details Grid -->
-                <div class="premium-details-grid">
-                    <div class="detail-item">
-                        <span class="detail-label">Platform</span>
-                        <span class="detail-value">
-                            <i class="ph-bold ph-monitor-play" style="color: #8b5cf6;"></i> 
-                            ${w.platform || 'Unassigned'}
-                        </span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="detail-label">Schedule Time</span>
-                        <span class="detail-value">
-                            <i class="ph-bold ph-calendar-plus" style="color: #3b82f6;"></i> 
-                            ${scheduleTime}
-                        </span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="detail-label">Posting Time</span>
-                        <span class="detail-value">
-                            <i class="ph-bold ph-paper-plane-tilt" style="color: #10b981;"></i> 
-                            ${postTime}
-                        </span>
-                    </div>
-                </div>
             </div>
         `;
     });
     
     container.innerHTML = html;
 },
-
             loadVault: async () => {
                 const container = document.getElementById('vaultContainer');
                 const links = await DB.get('vault_links') || [];
