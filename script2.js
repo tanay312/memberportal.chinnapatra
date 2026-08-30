@@ -215,6 +215,7 @@ if (deptData) {
     // Fallbacks if no department data exists
     document.getElementById('sidebarDept').innerText = 'General Team';
     document.getElementById('idCardDept').innerText = 'Creative Team';
+        AutoRefresh.start(3000);
 }
 
                 document.getElementById('gName').value = ArtistApp.user.name;
@@ -963,5 +964,60 @@ if (deptData) {
                 tbody.innerHTML = html || '<tr><td colspan="4" style="text-align:center; padding:40px; color:var(--text-muted); background:var(--white);">No leave history recorded.</td></tr>';
             }
         };
+        
+        const AutoRefresh = {
+    intervalId: null,
+    
+    // Default refresh time: 30 seconds (30000 milliseconds)
+    start: (interval = 3000) => {
+        if (AutoRefresh.intervalId) clearInterval(AutoRefresh.intervalId);
+        
+        console.log(`Auto Refresh Activated: Syncing every ${interval / 1000} seconds.`);
+        
+        AutoRefresh.intervalId = setInterval(async () => {
+            // ১. Modal Protection: ইউজার যদি কোনো ফর্ম পূরণ করে, তবে রিফ্রেশ হবে না
+            const modal = document.getElementById('mainModal');
+            if (modal && modal.classList.contains('active')) {
+                console.log("Auto-Refresh paused: User is interacting with a modal.");
+                return;
+            }
 
+            console.log("Running Background Auto-Refresh...");
+
+            try {
+                // ২. Artist App Auto-Refresh Logic
+                if (typeof ArtistApp !== 'undefined' && ArtistApp.user) {
+                    await ArtistApp.calculateMyPoints();
+                    ArtistApp.loadWork(); // Refresh Tasks
+                    ArtistApp.loadNotifications(); // Refresh Admin Messages
+                }
+                
+                // ৩. Media PR App Auto-Refresh Logic
+                if (typeof MediaPR !== 'undefined' && (MediaPR.user || App.currentUser)) {
+                    const newWorkflows = await DB.get('media_workflows');
+                    if (newWorkflows) {
+                        MediaPR.myTasks = newWorkflows;
+                        
+                        // শুধুমাত্র যদি ইউজার Task পেজে থাকে, তবেই UI রেন্ডার করবে
+                        const wrapper = document.getElementById('prMediaCardsWrapper');
+                        if (wrapper) {
+                            MediaPR.renderTasks(); 
+                        }
+                    }
+                }
+            } catch (error) {
+                console.warn("Auto-Refresh Silent Error:", error.message);
+            }
+
+        }, interval);
+    },
+
+    stop: () => {
+        if (AutoRefresh.intervalId) {
+            clearInterval(AutoRefresh.intervalId);
+            AutoRefresh.intervalId = null;
+            console.log("Auto Refresh Stopped.");
+        }
+    }
+};
         window.onload = () => { ArtistApp.init(); };
