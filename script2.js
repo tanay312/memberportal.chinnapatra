@@ -37,7 +37,7 @@
         };
 
         function spawnConfetti() {
-            const colors = ['#D4AF37', '#1F2937', '#0A1128', '#FFFFFF'];
+            const colors = ['#E6C98A', '#1F2937', '#36013F', '#FFFFFF'];
             for (let i = 0; i < 100; i++) {
                 let conf = document.createElement('div');
                 conf.className = 'confetti';
@@ -733,7 +733,7 @@ if (deptData) {
             downloadIDCardPDF: () => {
                 const u = ArtistApp.user;
                 const shortId = (u.id || '').substring(0, 6).toUpperCase();
-                const avatarHtml = u.image_link ? `<img src="${u.image_link}" style="width:100%; height:100%; object-fit:cover;">` : `<div style="font-size:40px; font-weight:bold; color:#0A1128;">${u.name.charAt(0)}</div>`;
+                const avatarHtml = u.image_link ? `<img src="${u.image_link}" style="width:100%; height:100%; object-fit:cover;">` : `<div style="font-size:40px; font-weight:bold; color:#36013F;">${u.name.charAt(0)}</div>`;
 
                 let printWindow = window.open('', '_blank');
                 let html = `
@@ -744,20 +744,20 @@ if (deptData) {
                         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
                         <style>
                             body { margin:0; padding:40px; display:flex; justify-content:center; align-items:center; background:#ffffff; font-family:'Poppins', sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                            .id-card { width: 340px; background: #0A1128; border-radius: 24px; overflow: hidden; border: 2px solid #D4AF37; color: white; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
-                            .header { background: #1A2442; padding: 24px; text-align: center; border-bottom: 2px solid #D4AF37; }
-                            .header h3 { color: #D4AF37; font-family: 'Playfair Display', serif; font-size: 26px; margin: 0; letter-spacing: 1px;}
+                            .id-card { width: 340px; background: #36013F; border-radius: 24px; overflow: hidden; border: 2px solid #E6C98A; color: white; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+                            .header { background: #4A1557; padding: 24px; text-align: center; border-bottom: 2px solid #E6C98A; }
+                            .header h3 { color: #E6C98A; font-family: 'Playfair Display', serif; font-size: 26px; margin: 0; letter-spacing: 1px;}
                             .header p { font-size: 10px; color: #9CA3AF; letter-spacing: 3px; text-transform: uppercase; margin-top: 6px; font-weight: 600;}
-                            .body { padding: 32px 24px; text-align: center; background: #0A1128; }
-                            .avatar { width: 110px; height: 110px; border-radius: 50%; border: 4px solid #D4AF37; margin: 0 auto 20px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+                            .body { padding: 32px 24px; text-align: center; background: #36013F; }
+                            .avatar { width: 110px; height: 110px; border-radius: 50%; border: 4px solid #E6C98A; margin: 0 auto 20px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; }
                             .name { font-size: 24px; font-weight: 700; font-family: 'Playfair Display', serif; margin-bottom: 4px; }
-                            .role { color: #D4AF37; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 24px; }
-                            .details { background: #1A2442; padding: 18px; border-radius: 12px; text-align: left; font-size: 12px; }
+                            .role { color: #E6C98A; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 24px; }
+                            .details { background: #4A1557; padding: 18px; border-radius: 12px; text-align: left; font-size: 12px; }
                             .details div { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 6px; }
                             .details div:last-child { margin-bottom: 0; border-bottom: none; padding-bottom: 0; }
                             .details span.label { color: #9CA3AF; }
                             .details span.val { font-weight: 600; color: #fff;}
-                            .footer { text-align: center; padding: 16px; background: #1A2442; font-size: 10px; color: #9CA3AF; font-weight: 600; letter-spacing: 1px; border-top: 1px solid rgba(255,255,255,0.05); }
+                            .footer { text-align: center; padding: 16px; background: #4A1557; font-size: 10px; color: #9CA3AF; font-weight: 600; letter-spacing: 1px; border-top: 1px solid rgba(255,255,255,0.05); }
                             @media print {
                                 body { padding:0; background:none; }
                                 @page { size: portrait; margin: 10mm; }
