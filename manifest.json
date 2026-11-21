@@ -1,10 +1,10 @@
 {
-  "name": "Chinnapatra Artist Workspace",
-  "short_name": "Chinnapatra Member Desk",
+  "name": "KothaVerse Artist Workspace",
+  "short_name": "KothaVerse Member Desk",
   "start_url": "index.html",
   "display": "standalone",
-  "background_color": "#0b1938",
-  "theme_color": "#c89b3c",
+  "background_color": "#36013F",
+  "theme_color": "#E6C98A",
   "orientation": "portrait",
   "icons": [
     {
